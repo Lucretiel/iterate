@@ -1,0 +1,16 @@
+[package]
+name = "generate"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+itertools = "0.10.0"
+joinery = { version = "2.1.0", features = ["token-stream"] }
+proc-macro2 = "1.0.27"
+quote = "1.0.9"
+syn = { version = "1.0.72", features = ["full"] }
+
+[lib]
+proc-macro = true
