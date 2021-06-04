@@ -206,6 +206,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
         })
         .join_with(Comma);
 
+    // All of the variants of the state enum, including the trailing dead variant.
     let variants = descriptors
         .iter()
         .map(StateVariant::from)
@@ -270,6 +271,67 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             .join_with(Comma)
     };
 
+    // Indices are used to check for before/after relationships between
+    // variants. This is used to implement double ended iteration and drop.
+    let idx_branch_arms = variants
+        .clone()
+        .scan(0usize, |state, variant| match variant {
+            StateVariant::Item { variant, .. } => {
+                let idx = *state;
+                *state += 1;
+
+                Some(quote! { #state_ident::#variant => #idx })
+            }
+            StateVariant::Iter {
+                base_variant,
+                iter_variant,
+                ..
+            } => {
+                let base_idx = *state;
+                let iter_idx = *state + 1;
+                *state += 2;
+
+                Some(quote! {
+                    #state_ident::#base_variant => #base_idx,
+                    #state_ident::#iter_variant(..) => #iter_idx
+                })
+            }
+            StateVariant::Dead { variant } => {
+                let idx = *state;
+                *state += 1;
+
+                Some(quote! { #state_ident::#variant => #idx })
+            }
+        });
+
+    // Distances are used when computing size_hint. Given a head and a tail,
+    // the difference between their distances is the number of single elements
+    // between them. Iter elements could have 0 items, so they're not used.
+    let distance_branch_arms = variants
+        .clone()
+        .scan(0usize, |state, variant| match variant {
+            StateVariant::Item { variant, .. } => {
+                let distance = *state;
+                *state += 1;
+
+                Some(quote! { #state_ident::#variant => #distance })
+            }
+            StateVariant::Iter {
+                base_variant,
+                iter_variant,
+                ..
+            } => Some(quote! {
+                #state_ident::#base_variant => #state,
+                #state_ident::#iter_variant(..) => #state
+            }),
+            StateVariant::Dead { variant } => {
+                let distance = *state;
+                *state += 1;
+
+                Some(quote! { #state_ident::#variant => #distance })
+            }
+        });
+
     let init_exprs = descriptors
         .iter()
         .map(|desc| match desc {
@@ -324,7 +386,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             }
         }
 
-        // Iterator impls (Interator, ReverseIterator, Fuse, Clone, Debug)
+        // Iterator impls (Iterator + size_hint, ReverseIterator, Fuse, Clone, Debug, Drop)
         #iter_ident {
             phantom: PhantomData,
 
