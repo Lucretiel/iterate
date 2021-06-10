@@ -262,10 +262,6 @@ impl Parse for GenerateItem {
                 }
             })
         } else {
-            // TODO: Eager items. Generally items should *never* be eager, as
-            // there's not really a meaningful difference between T and
-            // FnOnce()->T, but if there are control flow operators we'd like
-            // to respect that.
             input.parse().map(|expr| {
                 let mut visitor = IsLazyVisitor::new_lazy();
                 visitor.visit_expr(&expr);
@@ -288,8 +284,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
     let item_ident = Ident::new("T", Span::mixed_site());
 
     // Used for size_hint implementation
-    let lower_ident = Ident::new("lower", Span::mixed_site());
-    let upper_ident = Ident::new("upper", Span::mixed_site());
+    let size_hint_ident = Ident::new("size_hint", Span::mixed_site());
     let idx_ident = Ident::new("idx", Span::mixed_site());
 
     let descriptors = items
@@ -456,26 +451,22 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             .map(|(idx, variant)| match variant {
                 StateVariant::EagerItem { variant, .. }
                 | StateVariant::LazyItem { variant, .. } => quote! {
-                    #state_ident::#variant => (1usize, Some(1usize), #idx)
+                    #state_ident::#variant => (::iterate::exact_size_hint(1), #idx)
                 },
                 StateVariant::EagerIter { variant, field } => quote! {
                     #state_ident::#variant => {
                         let iter = unsafe { & *self.#field.as_ptr() };
-                        let (lower, upper) = iter.size_hint();
-                        (lower, upper, #idx)
+                        (iter.size_hint(), #idx)
                     }
                 },
                 StateVariant::BeginIter { variant, .. } => quote! {
-                    #state_ident::#variant => (0usize, None, #idx)
+                    #state_ident::#variant => (::iterate::any_size_hint(), #idx)
                 },
                 StateVariant::Iter { variant, .. } => quote! {
-                    #state_ident::#variant(ref iter) => {
-                        let (lower, upper) = iter.size_hint();
-                        (lower, upper, #idx)
-                    }
+                    #state_ident::#variant(ref iter) => (iter.size_hint(), #idx)
                 },
                 StateVariant::Dead { variant } => quote! {
-                    #state_ident::#variant => return (0usize, Some(0usize))
+                    #state_ident::#variant => return (::iterate::exact_size_hint(0))
                 },
             });
 
@@ -487,19 +478,19 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             .filter_map(|(idx, variant)| match variant {
                 StateVariant::EagerItem { .. } | StateVariant::LazyItem { .. } => Some(quote! {
                     if #idx_ident < #idx {
-                        #lower_ident = #lower_ident.saturating_add(1);
-                        #upper_ident = #upper_ident.and_then(|upper| upper.checked_add(1));
+                        #size_hint_ident = ::iterate::add_size_hints(
+                            #size_hint_ident,
+                            ::iterate::exact_size_hint(1),
+                        );
                     }
                 }),
                 StateVariant::EagerIter { field, .. } => Some(quote! {
                     if #idx_ident < #idx {
                         let iter = unsafe { & *self.#field.as_ptr() };
-                        let (field_lower, field_upper) = iter.size_hint();
-                        #lower_ident = #lower_ident.saturating_add(field_lower);
-                        #upper_ident = match (#upper_ident, field_upper) {
-                            (Some(u1), Some(u2)) => u1.checked_add(u2),
-                            _ => None,
-                        };
+                        #size_hint_ident = ::iterate::add_size_hints(
+                            #size_hint_ident,
+                            iter.size_hint(),
+                        );
                     }
                 }),
                 StateVariant::BeginIter { .. }
@@ -591,13 +582,13 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             }
 
             fn size_hint(&self) -> (usize, Option<usize>) {
-                let (mut #lower_ident, mut #upper_ident, #idx_ident) = match self.head {
+                let (mut #size_hint_ident, #idx_ident) = match self.head {
                     #(#begin_size_hint_branch_arms,)*
                 };
 
                 #(#finish_size_hint_blocks)*
 
-                (#lower_ident, #upper_ident)
+                #size_hint_ident
             }
         }
 

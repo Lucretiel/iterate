@@ -138,3 +138,32 @@ impl<I: FusedIterator> FusedIterator for ConcealedIterator<I> {}
 pub fn conceal<I: Iterator>(iter: I) -> ConcealedIterator<I> {
     ConcealedIterator { iter }
 }
+
+/// Create a (0, None) size hint, representing any possible iterator
+#[inline]
+#[must_use]
+pub const fn any_size_hint() -> (usize, Option<usize>) {
+    (0, None)
+}
+
+/// Helper function for creating a size hint from a known value
+#[inline]
+#[must_use]
+pub const fn exact_size_hint(size: usize) -> (usize, Option<usize>) {
+    (size, Some(size))
+}
+
+/// Helper function for adding together a pair of size hints
+#[inline]
+#[must_use]
+pub const fn add_size_hints(
+    (lower1, upper1): (usize, Option<usize>),
+    (lower2, upper2): (usize, Option<usize>),
+) -> (usize, Option<usize>) {
+    let lower = lower1.saturating_add(lower2);
+    let upper = match (upper1, upper2) {
+        (Some(upper1), Some(upper2)) => upper1.checked_add(upper2),
+        _ => None,
+    };
+    (lower, upper)
+}
