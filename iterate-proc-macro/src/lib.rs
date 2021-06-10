@@ -299,27 +299,27 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             GenerateItem::EagerItem(expr) => GenerateDescriptor::EagerItem {
                 field: format_ident!("eager_item{}", i, span = Span::mixed_site()),
                 ty: &item_ident,
-                variant: format_ident!("State{}", i, span = Span::mixed_site()),
+                variant: format_ident!("StateItem{}", i, span = Span::mixed_site()),
                 expr,
             },
             GenerateItem::LazyItem(expr) => GenerateDescriptor::LazyItem {
                 field: format_ident!("lazy_item{}", i, span = Span::mixed_site()),
                 ty: format_ident!("Item{}", i, span = Span::mixed_site()),
-                variant: format_ident!("State{}", i, span = Span::mixed_site()),
+                variant: format_ident!("StateItem{}", i, span = Span::mixed_site()),
                 expr,
             },
             GenerateItem::EagerIter(expr) => GenerateDescriptor::EagerIter {
                 field: format_ident!("eager_iter{}", i, span = Span::mixed_site()),
                 ty: format_ident!("Iter{}", i, span = Span::mixed_site()),
-                variant: format_ident!("State{}", i, span = Span::mixed_site()),
+                variant: format_ident!("StateIter{}", i, span = Span::mixed_site()),
                 expr,
             },
             GenerateItem::LazyIter(expr) => GenerateDescriptor::LazyIter {
                 field: format_ident!("lazy_iter{}", i, span = Span::mixed_site()),
                 lazy_ty: format_ident!("IterFunc{}", i, span = Span::mixed_site()),
                 iter_ty: format_ident!("Iter{}", i, span = Span::mixed_site()),
-                base_variant: format_ident!("State{}", i, span = Span::mixed_site()),
-                iter_variant: format_ident!("IterState{}", i, span = Span::mixed_site()),
+                base_variant: format_ident!("StateBeginIter{}", i, span = Span::mixed_site()),
+                iter_variant: format_ident!("StateIter{}", i, span = Span::mixed_site()),
                 variant_ty: format_ident!("Iter{}", i, span = Span::mixed_site()),
                 expr,
             },
@@ -435,7 +435,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             },
             StateVariant::BeginIter { variant, field } => quote! {
                 #state_ident::#variant => #state_ident::#next_variant(
-                    ::core::iter::IntoIterator::into_iter(unsafe { self.#field.as_mut_ptr().read() }())
+                    unsafe { self.#field.as_mut_ptr().read() }()
                 )
             },
             StateVariant::Iter { variant, .. } => quote! {

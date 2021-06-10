@@ -8,7 +8,7 @@ fn main() {
     let data: Vec<&i32> = iter.collect();
     println!("{:#?}", data);
 
-    let range = 0..5;
+    let range: Vec<i32> = (0..5).collect();
     let vec = vec![4, 1, 2, 3];
 
     let iterator = iterate::iterate![
