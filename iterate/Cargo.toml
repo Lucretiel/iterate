@@ -1,6 +1,6 @@
 [package]
 name = "iterate"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2018"
 authors = ["Nathan West <Lucretiel@gmail.com>"]
 
@@ -10,6 +10,6 @@ description = "Support crate for `iterate`"
 repository = "https://github.com/Lucretiel/iterate"
 
 [dependencies]
-iterate-proc-macro = { version = "1.0.0", path = "../iterate-proc-macro/" }
+iterate-proc-macro = { version = "2.0.0", path = "../iterate-proc-macro/" }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
