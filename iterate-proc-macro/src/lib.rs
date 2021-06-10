@@ -1,3 +1,7 @@
+/*!
+Support crate for `iterate`. Do not depend directly on this crate.
+*/
+
 mod visitor;
 
 use std::{array, iter};
@@ -373,9 +377,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
 
     // The set of type arguments applied to the state enum
     let state_in_struct_generics = descriptors.iter().filter_map(|desc| match desc {
-        GenerateDescriptor::LazyIter { iter_ty, .. } => Some(quote! {
-            <#iter_ty as IntoIterator>::IntoIter
-        }),
+        GenerateDescriptor::LazyIter { iter_ty, .. } => Some(iter_ty),
         _ => None,
     });
 
@@ -433,7 +435,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             },
             StateVariant::BeginIter { variant, field } => quote! {
                 #state_ident::#variant => #state_ident::#next_variant(
-                    unsafe { self.#field.as_mut_ptr().read() }().into_iter()
+                    ::core::iter::IntoIterator::into_iter(unsafe { self.#field.as_mut_ptr().read() }())
                 )
             },
             StateVariant::Iter { variant, .. } => quote! {
@@ -454,7 +456,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             .map(|(idx, variant)| match variant {
                 StateVariant::EagerItem { variant, .. }
                 | StateVariant::LazyItem { variant, .. } => quote! {
-                    #state_ident::#variant => (1, Some(1), #idx)
+                    #state_ident::#variant => (1usize, Some(1usize), #idx)
                 },
                 StateVariant::EagerIter { variant, field } => quote! {
                     #state_ident::#variant => {
@@ -464,7 +466,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
                     }
                 },
                 StateVariant::BeginIter { variant, .. } => quote! {
-                    #state_ident::#variant => (0, None, #idx)
+                    #state_ident::#variant => (0usize, None, #idx)
                 },
                 StateVariant::Iter { variant, .. } => quote! {
                     #state_ident::#variant(ref iter) => {
@@ -473,7 +475,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
                     }
                 },
                 StateVariant::Dead { variant } => quote! {
-                    #state_ident::#variant => return (0, Some(0))
+                    #state_ident::#variant => return (0usize, Some(0usize))
                 },
             });
 
@@ -532,13 +534,17 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
         });
 
     let init_exprs = descriptors.iter().map(|desc| match desc {
-        GenerateDescriptor::LazyItem { field, expr, .. }
-        | GenerateDescriptor::LazyIter { field, expr, .. } => quote! {
+        GenerateDescriptor::EagerItem { field, expr, .. } => quote! {
+            #field: MaybeUninit::new(#expr)
+        },
+        GenerateDescriptor::EagerIter { field, expr, .. } => quote! {
+            #field: MaybeUninit::new(::core::iter::IntoIterator::into_iter(#expr))
+        },
+        GenerateDescriptor::LazyItem { field, expr, .. } => quote! {
             #field: MaybeUninit::new(move || #expr)
         },
-        GenerateDescriptor::EagerIter { field, expr, .. }
-        | GenerateDescriptor::EagerItem { field, expr, .. } => quote! {
-            #field: MaybeUninit::new(#expr)
+        GenerateDescriptor::LazyIter { field, expr, .. } => quote! {
+            #field: MaybeUninit::new(move || ::core::iter::IntoIterator::into_iter(#expr))
         },
     });
 

@@ -1,7 +1,13 @@
 [package]
 name = "iterate-proc-macro"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2018"
+authors = ["Nathan West <Lucretiel@gmail.com>"]
+
+readme = "README.md"
+license = "MPL-2.0"
+description = "Support crate for `iterate`"
+repository = "https://github.com/Lucretiel/iterate"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

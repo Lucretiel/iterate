@@ -1,5 +1,13 @@
+/*!
+Powerful macro for creating iterators on the fly. See [`iterate`] for details.
+*/
+
+#![no_std]
+
+use core::fmt;
 use core::fmt::Debug;
-use std::iter::FusedIterator;
+use core::fmt::Formatter;
+use core::iter::FusedIterator;
 
 /**
 Create an iterator on the fly
@@ -44,7 +52,7 @@ assert_eq!(cell.get(), 3);
 assert_eq!(iterator.next(), None);
 ```
 
-Most usefully, `iterate` can capture any other [`Iterator`] type and
+Most usefully, `iterate` can capture any other [`IntoIterator`] type and
 iterate over it, by prefixing the value with `..`:
 
 ```
@@ -52,6 +60,10 @@ use iterate::iterate;
 
 let range = 0..5;
 let vec = vec![4, 1, 2, 3];
+
+// Iterate captures its arguments by move, and evaluates them lazily, so we
+// need to ensure that the vec is captured by reference
+let vec = &vec;
 
 let iterator = iterate![
     1,
@@ -61,9 +73,20 @@ let iterator = iterate![
 ];
 
 let result: Vec<i32> = iterator.collect();
+assert_eq!(result, [
+    1,
+    0, 1, 2, 3, 4,
+    4, 1, 2, 3,
+    10,
+])
 ```
 
+# Eager and Lazy evaluation
 
+`iterate` tries to be smart about when it evaluates its arguments eagerly vs
+lazily. In general it tries to evaluate them lazily, but in cases where it's
+sure there will be no side effects, it evaluates `..iter` arguments eagerly.
+It does this so that it can provide a more reliable `size_hint`.
 */
 pub use iterate_proc_macro::iterate;
 
@@ -79,7 +102,7 @@ pub struct ConcealedIterator<I> {
 }
 
 impl<I: Debug> Debug for ConcealedIterator<I> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.iter.fmt(f)
     }
 }
