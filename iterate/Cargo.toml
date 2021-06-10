@@ -1,0 +1,9 @@
+[package]
+name = "iterate"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+iterate-proc-macro = { version = "0.1.0", path = "../iterate-proc-macro/" }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
