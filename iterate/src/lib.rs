@@ -88,7 +88,11 @@ lazily. In general it tries to evaluate them lazily, but in cases where it's
 sure there will be no side effects, it evaluates `..iter` arguments eagerly.
 It does this so that it can provide a more reliable `size_hint`.
 */
-pub use iterate_proc_macro::iterate;
+pub use iterate_proc_macro::iterate as iterate_raw;
+#[macro_export]
+macro_rules! iterate {
+    ($($args:tt)*) => { $crate::iterate_raw!($crate unsafe ($($args)*)) }
+}
 
 /// The [`iterate`] macro produces a type that uses unsafe in the
 /// implementation. It is therefore critical that users of the library not
