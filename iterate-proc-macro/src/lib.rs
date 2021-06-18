@@ -276,6 +276,17 @@ impl Parse for GenerateItem {
 }
 
 fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
+    let mut iter = tokens.into_iter();
+    let t1 = iter.next().expect("the crate token");
+    let iterate_crate = syn::parse2::<syn::Ident>(t1.into())?;
+    let t2 = iter.next().expect("the unsafe token");
+    let _ = syn::parse2::<Token![unsafe]>(t2.into())?;
+    let t3 = iter.next().expect("the rest of the args");
+    let tokens = match t3 {
+        proc_macro2::TokenTree::Group(g) => { g.stream() }
+        other => { panic!("unexpected 3rd arg {:?}", other); }
+    };
+
     let items: Punctuated<GenerateItem, Token![,]> = Punctuated::parse_terminated.parse2(tokens)?;
 
     let dead_ident = Ident::new("Dead", Span::mixed_site());
@@ -451,7 +462,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             .map(|(idx, variant)| match variant {
                 StateVariant::EagerItem { variant, .. }
                 | StateVariant::LazyItem { variant, .. } => quote! {
-                    #state_ident::#variant => (::iterate::exact_size_hint(1), #idx)
+                    #state_ident::#variant => (#iterate_crate::exact_size_hint(1), #idx)
                 },
                 StateVariant::EagerIter { variant, field } => quote! {
                     #state_ident::#variant => {
@@ -460,13 +471,13 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
                     }
                 },
                 StateVariant::BeginIter { variant, .. } => quote! {
-                    #state_ident::#variant => (::iterate::any_size_hint(), #idx)
+                    #state_ident::#variant => (#iterate_crate::any_size_hint(), #idx)
                 },
                 StateVariant::Iter { variant, .. } => quote! {
                     #state_ident::#variant(ref iter) => (iter.size_hint(), #idx)
                 },
                 StateVariant::Dead { variant } => quote! {
-                    #state_ident::#variant => return (::iterate::exact_size_hint(0))
+                    #state_ident::#variant => return (#iterate_crate::exact_size_hint(0))
                 },
             });
 
@@ -478,16 +489,16 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
             .filter_map(|(idx, variant)| match variant {
                 StateVariant::EagerItem { .. } | StateVariant::LazyItem { .. } => Some(quote! {
                     if #idx_ident < #idx {
-                        #size_hint_ident = ::iterate::add_size_hints(
+                        #size_hint_ident = #iterate_crate::add_size_hints(
                             #size_hint_ident,
-                            ::iterate::exact_size_hint(1),
+                            #iterate_crate::exact_size_hint(1),
                         );
                     }
                 }),
                 StateVariant::EagerIter { field, .. } => Some(quote! {
                     if #idx_ident < #idx {
                         let iter = unsafe { & *self.#field.as_ptr() };
-                        #size_hint_ident = ::iterate::add_size_hints(
+                        #size_hint_ident = #iterate_crate::add_size_hints(
                             #size_hint_ident,
                             iter.size_hint(),
                         );
@@ -612,7 +623,7 @@ fn generate_impl(tokens: TokenStream2) -> syn::Result<TokenStream2> {
         }
 
         // Iterator impls (Iterator + size_hint, ReverseIterator, Fuse, Clone, Debug, Drop)
-        ::iterate::conceal(#iter_ident {
+        #iterate_crate::conceal(#iter_ident {
             phantom: PhantomData,
 
             head: #state_ident::#first_variant,
